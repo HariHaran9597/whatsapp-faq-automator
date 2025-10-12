@@ -1,0 +1,35 @@
+# --- Secrets ---
+# Never commit secret files to version control!
+.env
+firebase-credentials.json
+
+# --- Virtual Environment ---
+# Ignore the entire virtual environment folder.
+venv/
+/venv/
+
+# --- Python Cache & Compiled Files ---
+# These are generated automatically by Python.
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Temporary Data ---
+# Ignore the folder where temporary audio files are stored.
+data/temp_audio/
+
+# --- IDE/Editor Folders ---
+# Ignore configuration folders for common editors like VS Code.
+.vscode/
+.idea/
+
+# --- FAISS Index Files ---
+# These are binary files generated from your PDFs and can be recreated.
+# It's better to not store them in git.
+data/faiss_index/
+data/chunks/
+
+# --- Local PDF Uploads ---
+# Ignore the PDFs uploaded by the business owner.
+data/pdfs/

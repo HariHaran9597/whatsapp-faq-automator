@@ -1,0 +1,33 @@
+# Use an official Python runtime as a parent image
+FROM python:3.11-slim
+
+# Install system dependencies needed for FFmpeg (for pydub) and other libraries
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy the requirements file into the container at /app
+COPY requirements.txt .
+
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download and cache the Whisper model during the build process.
+# This saves time on the first startup of the live server.
+RUN python -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8')"
+
+# Copy your application's source code into the container
+COPY ./backend ./backend
+COPY ./data ./data
+COPY .env .
+COPY firebase-credentials.json .
+
+# Make port 8000 available to the world outside this container
+EXPOSE 8000
+
+# Define the command to run your app using uvicorn
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
