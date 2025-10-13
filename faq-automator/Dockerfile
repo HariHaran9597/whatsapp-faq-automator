@@ -2,7 +2,7 @@
 FROM python:3.11-slim
 
 # Install system dependencies
-# ADDED: FFmpeg development libraries (libav*-dev) required to build PyAV
+# FINAL FIX: Added 'build-essential' which includes the GCC compiler
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     git \
@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     libavfilter-dev \
     libswscale-dev \
     libswresample-dev \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
