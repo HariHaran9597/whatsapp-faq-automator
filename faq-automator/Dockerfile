@@ -1,11 +1,19 @@
 # Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
-# New, corrected version
+# Install system dependencies
+# ADDED: FFmpeg development libraries (libav*-dev) required to build PyAV
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     git \
     pkg-config \
+    libavformat-dev \
+    libavcodec-dev \
+    libavdevice-dev \
+    libavutil-dev \
+    libavfilter-dev \
+    libswscale-dev \
+    libswresample-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
@@ -17,8 +25,7 @@ COPY requirements.txt .
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download and cache the Whisper model during the build process.
-# This saves time on the first startup of the live server.
+# Download and cache the Whisper model during the build process
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8')"
 
 # Copy your application's source code into the container
