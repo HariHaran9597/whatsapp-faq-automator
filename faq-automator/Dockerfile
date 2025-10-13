@@ -23,8 +23,6 @@ RUN python -c "from faster_whisper import WhisperModel; WhisperModel('base', dev
 # Copy your application's source code into the container
 COPY ./backend ./backend
 COPY ./data ./data
-COPY .env .
-
 
 # Make port 8000 available to the world outside this container
 EXPOSE 8000
