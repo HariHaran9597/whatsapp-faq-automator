@@ -1,10 +1,11 @@
 # Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
-# Install system dependencies needed for FFmpeg (for pydub) and other libraries
+# New, corrected version
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     git \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory in the container
