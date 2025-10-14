@@ -37,7 +37,6 @@ async def transcribe_audio(media_url: str) -> str:
         print(f"Audio downloaded to {ogg_path}")
 
         # Step C: Transcribe the .ogg file DIRECTLY
-        # faster-whisper will use ffmpeg behind the scenes to handle the format.
         segments, _ = WHISPER_MODEL.transcribe(str(ogg_path), beam_size=5)
         
         transcribed_text = " ".join([segment.text for segment in segments])
