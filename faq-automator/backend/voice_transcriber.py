@@ -12,7 +12,7 @@ TEMP_AUDIO_PATH.mkdir(parents=True, exist_ok=True)
 
 print("Loading Whisper model...")
 try:
-    WHISPER_MODEL = WhisperModel("base", device="cpu", compute_type="int8")
+    WHISPER_MODEL = WhisperModel("tiny", device="cpu", compute_type="int8")
     print("Whisper model loaded successfully.")
 except Exception as e:
     WHISPER_MODEL = None
