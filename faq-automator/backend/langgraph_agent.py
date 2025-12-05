@@ -54,15 +54,18 @@ def generation_node(state: AgentState) -> dict:
     history = state.get("conversation_history", [])
     
     # Format the conversation history for the prompt
-    history_str = "\n".join([f"{type(msg).__name__}: {msg.content}" for msg in history])
+    history_str = "\n".join([f"{type(msg).__name__}: {msg.content}" for msg in history]) if history else "No prior messages."
 
-    formatted_prompt = PROMPT_TEMPLATE.format(
-        retrieved_chunks=context,
-        conversation_history=history_str,
-        user_query=user_query
-    )
-    
-    response = MODEL.generate_content(formatted_prompt)
+    try:
+        formatted_prompt = PROMPT_TEMPLATE.format(
+            retrieved_chunks=context,
+            conversation_history=history_str,
+            user_query=user_query
+        )
+        response = MODEL.generate_content(formatted_prompt)
+    except Exception as e:
+        print(f"Error in generation node: {e}")
+        return {"ai_answer": "I'm sorry, I encountered an error generating a response. Please try again."}
     
     return {"ai_answer": response.text.strip()}
 

@@ -33,6 +33,9 @@ STRICT RULES:
 3. Be concise and answer in a friendly, conversational tone.
 4. Do not mention the word 'context' or 'brochure' in your answer. Just provide the information.
 
+CONVERSATION HISTORY (for context only):
+{conversation_history}
+
 CONTEXT:
 {retrieved_chunks}
 
@@ -73,7 +76,8 @@ async def generate_answer(query: str, business_metadata: dict) -> str:
     # --- Step C: Fill in the prompt template ---
     formatted_prompt = PROMPT_TEMPLATE.format(
         retrieved_chunks=context_str,
-        user_query=query
+        user_query=query,
+        conversation_history=""  # No history in simple RAG mode
     )
 
     # --- Step D: Call the Gemini API ---

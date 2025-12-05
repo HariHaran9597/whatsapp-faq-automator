@@ -1,7 +1,8 @@
 # backend/whatsapp_handler.py
 
-from fastapi import APIRouter, Form, Response
+from fastapi import APIRouter, Form, Response, Request, HTTPException
 from twilio.twiml.messaging_response import MessagingResponse
+from twilio.request_validator import RequestValidator
 import logging
 from langchain_core.messages import AIMessage, HumanMessage
 
@@ -10,6 +11,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from backend.voice_transcriber import transcribe_audio
 from backend.firebase_client import store_conversation
 from backend.langgraph_agent import conversational_agent
+from backend.config import settings
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO)
@@ -22,8 +24,26 @@ router = APIRouter()
 # In a production system with multiple server instances, you'd use a shared store like Redis.
 conversation_history_cache = {}
 
+# --- Initialize Twilio Request Validator ---
+twilio_validator = RequestValidator(settings.TWILIO_AUTH_TOKEN)
+
+def validate_twilio_request(request_url: str, params: dict, signature: str) -> bool:
+    """
+    Validates that the incoming request is actually from Twilio.
+    
+    Args:
+        request_url: The full URL of the request
+        params: The request parameters/body
+        signature: The X-Twilio-Signature header value
+        
+    Returns:
+        True if valid, False otherwise
+    """
+    return twilio_validator.validate(request_url, params, signature)
+
 @router.post("/whatsapp-webhook")
 async def handle_whatsapp(
+    request: Request,
     From: str = Form(...),
     Body: str = Form(None),
     NumMedia: int = Form(0),
@@ -32,11 +52,35 @@ async def handle_whatsapp(
     """
     Handles incoming WhatsApp messages, uses a LangGraph agent for conversational
     memory, and ensures a robust 200 OK response is always sent to Twilio.
+    
+    IMPORTANT: This endpoint validates all incoming requests to ensure they come from Twilio.
     """
     sender_id = From
     response = MessagingResponse()
     
     try:
+        # --- Validate that the request came from Twilio ---
+        # Get the signature from the X-Twilio-Signature header
+        twilio_signature = request.headers.get("X-Twilio-Signature", "")
+        
+        if not twilio_signature:
+            logger.warning("Request missing X-Twilio-Signature header - rejecting")
+            raise HTTPException(status_code=403, detail="Invalid Twilio signature")
+        
+        # Get the full request URL
+        request_url = str(request.url)
+        
+        # Get the request parameters
+        form_data = await request.form()
+        params = dict(form_data)
+        
+        # Validate the signature
+        if not validate_twilio_request(request_url, params, twilio_signature):
+            logger.warning(f"Invalid Twilio signature from {sender_id} - rejecting")
+            raise HTTPException(status_code=403, detail="Invalid Twilio signature")
+        
+        logger.info(f"✅ Twilio signature verified for user {sender_id}")
+        
         # --- Initialize variables ---
         text_to_process = ""
         response_prefix = ""
@@ -59,41 +103,48 @@ async def handle_whatsapp(
 
         # --- Use the LangGraph Agent to get a response ---
         if text_to_process:
-            # 1. Retrieve the user's past messages from our cache
-            history = conversation_history_cache.get(sender_id, [])
+            try:
+                # 1. Retrieve the user's past messages from our cache
+                history = conversation_history_cache.get(sender_id, [])
 
-            # 2. Invoke the agent with the current state
-            result = conversational_agent.invoke({
-                "user_query": text_to_process,
-                "business_id": "business_01", # Hardcoded for now
-                "conversation_history": history
-            })
-            
-            # 3. Extract the final answer from the agent's result
-            ai_answer = result.get("ai_answer", "Sorry, I couldn't generate a response.")
-            
-            # 4. Update the history cache with this new turn
-            conversation_history_cache[sender_id] = history + [
-                HumanMessage(content=text_to_process),
-                AIMessage(content=ai_answer)
-            ]
+                # 2. Invoke the agent with the current state
+                result = conversational_agent.invoke({
+                    "user_query": text_to_process,
+                    "business_id": "business_01", # Hardcoded for now
+                    "conversation_history": history
+                })
+                
+                # 3. Extract the final answer from the agent's result
+                ai_answer = result.get("ai_answer", "Sorry, I couldn't generate a response.")
+                
+                # 4. Update the history cache with this new turn
+                conversation_history_cache[sender_id] = history + [
+                    HumanMessage(content=text_to_process),
+                    AIMessage(content=ai_answer)
+                ]
 
-            # --- Log and send the response ---
-            logger.info(f"Sending AI answer to {sender_id}: '{ai_answer}'")
-            final_response_message = f"{response_prefix}{ai_answer}"
-            response.message(final_response_message)
+                # --- Log and send the response ---
+                logger.info(f"Sending AI answer to {sender_id}: '{ai_answer}'")
+                final_response_message = f"{response_prefix}{ai_answer}"
+                response.message(final_response_message)
 
-            conversation_log = {
-                "user_id": sender_id, "business_id": "business_01",
-                "query": text_to_process, "query_type": query_type,
-                "transcription": transcription, "answer": ai_answer,
-            }
-            await store_conversation(conversation_log)
+                conversation_log = {
+                    "user_id": sender_id, "business_id": "business_01",
+                    "query": text_to_process, "query_type": query_type,
+                    "transcription": transcription, "answer": ai_answer,
+                }
+                await store_conversation(conversation_log)
+            except Exception as agent_error:
+                logger.error(f"Error processing message from {sender_id}: {agent_error}", exc_info=True)
+                response.message("I encountered an error processing your request. Please try again.")
         else:
             response.message("I had trouble understanding your message. Could you please try again?")
 
         return Response(content=str(response), media_type="application/xml")
 
+    except HTTPException:
+        # Signature validation failed - don't process the request
+        return Response(status_code=403)
     except Exception as e:
         logger.error(f"An unexpected error occurred in the webhook for user {sender_id}: {e}", exc_info=True)
         # Always return a 200 OK response with a friendly error message to Twilio

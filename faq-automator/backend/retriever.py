@@ -24,7 +24,7 @@ def retrieve_context(query: str, business_id: str, top_k: int = 3) -> List[Dict]
     chunks_file = CHUNKS_PATH / f"{business_id}_chunks.pkl"
 
     if not index_file.exists() or not chunks_file.exists():
-        print(f"Error: Index or chunks file not found for business_id '{business_id}'")
+        print(f"Warning: No FAISS index found for business_id '{business_id}'. Please upload a PDF first.")
         return []
 
     try:
